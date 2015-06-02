@@ -301,7 +301,7 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
 
             $allAttributes = $config->getEntityAttributeCodes('catalog_product');
 
-            $productAttributes = array_merge(array('name', 'path', 'categories', 'description', 'ordered_qty', 'stock_qty'), $allAttributes);
+            $productAttributes = array_merge(array('name', 'path', 'categories', 'description', 'ordered_qty', 'stock_qty', 'price_with_tax'), $allAttributes);
 
             $excludedAttributes = array(
                 'all_children', 'available_sort_by', 'children', 'children_count', 'custom_apply_to_products',
@@ -488,58 +488,95 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
             'description'       => $product->getDescription()
         );
 
-        $categories     = array();
+        $categories             = array();
+        $categories_with_path   = array();
 
         foreach ($this->getProductActiveCategories($product, $product->getStoreId()) as $categoryId)
-            if ($categoryName = $this->getCategoryName($categoryId, $product->getStoreId()))
-                array_push($categories, $categoryName);
-
-        try
         {
-            $customData['thumbnail_url'] = $product->getThumbnailUrl();
-            $customData['thumbnail_url'] = str_replace(array('https://', 'http://'), '//', $customData['thumbnail_url']);
-        }
-        catch(\Exception $e) {}
+            $category = Mage::getModel('catalog/category')->load($categoryId);
 
-        try
-        {
-            $customData['image_url'] = $product->getImageUrl();
-            $customData['image_url'] = str_replace(array('https://', 'http://'), '//', $customData['image_url']);
-        }
-        catch(\Exception $e) {}
+            $categoryName = $category->getName();
 
-        $report = $this->getReportForProduct($product);
+            if ($categoryName)
+                $categories[] = $categoryName;
 
-        $customData['ordered_qty']      = intval($report->getOrderedQty());
-        $customData['stock_qty']        = (int) Mage::getModel('cataloginventory/stock_item')->loadByProduct($product)->getQty();
-        
-        if ($product->getTypeId() == 'configurable')
-        {
-            $sub_products   = $product->getTypeInstance(true)->getUsedProducts(null, $product);
-            $ordered_qty    = 0;
-            $stock_qty      = 0;
+            $category->getUrlInstance()->setStore($product->getStoreId());
+            $path = '';
 
-            foreach ($sub_products as $sub_product)
+            foreach ($category->getPathIds() as $treeCategoryId)
             {
-                $stock_qty += (int) Mage::getModel('cataloginventory/stock_item')->loadByProduct($sub_product)->getQty();
+                if ($path != '')
+                    $path .= ' /// ';
 
-                $report = $this->getReportForProduct($sub_product);
-
-                $ordered_qty += intval($report->getOrderedQty());
+                $path .= $this->getCategoryName($treeCategoryId, $product->getStoreId());
             }
 
-            $customData['ordered_qty']  = $ordered_qty;
-            $customData['stock_qty']    = $stock_qty;
+            $categories_with_path[] = $path;
+        }
+
+        $customData['categories'] = $categories_with_path;
+
+        $customData['categories_without_path'] = $categories;
+
+        if (false === isset($defaultData['thumbnail_url']))
+        {
+            try
+            {
+                $customData['thumbnail_url'] = $product->getThumbnailUrl();
+                $customData['thumbnail_url'] = str_replace(array('https://', 'http://'
+                ), '//', $customData['thumbnail_url']);
+            }
+            catch (\Exception $e) {}
+        }
+
+        if (false === isset($defaultData['image_url']))
+        {
+            try
+            {
+                $customData['image_url'] = $product->getImageUrl();
+                $customData['image_url'] = str_replace(array('https://', 'http://'), '//', $customData['image_url']);
+            }
+            catch (\Exception $e) {}
         }
 
         $additionalAttributes = $this->getProductAdditionalAttributes($product->getStoreId());
 
+        // skip default calculation if we have provided these attributes via the observer in $defaultData
+        if (false === isset($defaultData['ordered_qty']) && false === isset($defaultData['stock_qty']))
+        {
+            $ordered_qty = Mage::getResourceModel('reports/product_collection')
+                ->addOrderedQty()
+                ->addAttributeToFilter('sku', $product->getSku())
+                ->setOrder('ordered_qty', 'desc')
+                ->getFirstItem()
+                ->ordered_qty;
 
-        if ($this->isAttributeEnabled($additionalAttributes, 'ordered_qty') == false)
-            unset($customData['ordered_qty']);
+            $customData['ordered_qty'] = (int) $ordered_qty;
+            $customData['stock_qty']   = (int) Mage::getModel('cataloginventory/stock_item')->loadByProduct($product)->getQty();
 
-        if ($this->isAttributeEnabled($additionalAttributes, 'stock_qty') == false)
-            unset($customData['stock_qty']);
+            if ($product->getTypeId() == 'configurable')
+            {
+                $sub_products = $product->getTypeInstance(true)->getUsedProducts(null, $product);
+                $ordered_qty  = 0;
+                $stock_qty    = 0;
+
+                foreach ($sub_products as $sub_product)
+                {
+                    $stock_qty += (int)Mage::getModel('cataloginventory/stock_item')->loadByProduct($sub_product)->getQty();
+
+                    $ordered_qty += (int) $this->getReportForProduct($sub_product)->ordered_qty;
+                }
+
+                $customData['ordered_qty'] = $ordered_qty;
+                $customData['stock_qty']   = $stock_qty;
+            }
+
+            if ($this->isAttributeEnabled($additionalAttributes, 'ordered_qty') == false)
+                unset($customData['ordered_qty']);
+
+            if ($this->isAttributeEnabled($additionalAttributes, 'stock_qty') == false)
+                unset($customData['stock_qty']);
+        }
 
         foreach ($additionalAttributes as $attribute)
         {
@@ -548,10 +585,9 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
                 : $product->getData($attribute['attribute']);
 
             $value = Mage::getResourceSingleton('algoliasearch/fulltext')->getAttributeValue($attribute['attribute'], $value, $product->getStoreId(), Mage_Catalog_Model_Product::ENTITY);
+
             if ($value)
-            {
                 $customData[$attribute['attribute']] = $value;
-            }
         }
 
         $customData = array_merge($customData, $defaultData);
@@ -1135,41 +1171,39 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
     public function getCategoryAdditionalAttributes($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_CATEGORY_ATTRIBUTES, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getProductAdditionalAttributes($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_PRODUCT_ATTRIBUTES, $storeId));
+        return is_array($attrs) ? $attrs : array();
+    }
 
-        if (is_array($attrs))
-            return $attrs;
+    public function getFacets($storeId = NULL)
+    {
+        $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_FACETS, $storeId));
+        if(!$attrs){
+            return array();
+        }
 
-        return array();
+        foreach ($attrs as &$attr)
+            if ($attr['type'] == 'other')
+                $attr['type'] = $attr['other_type'];
+
+        return is_array($attrs) ? array_values($attrs) : array();
     }
 
     public function getCategoryCustomRanking($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_CATEGORY_CUSTOM_RANKING, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getProductCustomRanking($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_PRODUCT_CUSTOM_RANKING, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getSaveLastQuery($storeId = NULL)
@@ -1190,11 +1224,20 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
     public function getExcludedPages($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_EXCLUDED_PAGES, $storeId));
+        return is_array($attrs) ? $attrs : array();
+    }
 
-        if (is_array($attrs))
-            return $attrs;
+    public function getSortingIndices($storeId = NULL)
+    {
+        $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_SORTING_INDICES, $storeId));
+        if(!$attrs){
+            return array();
+        }
 
-        return array();
+        foreach ($attrs as &$attr)
+            $attr['index_name'] = $this->getIndexName($storeId).'_products_'.$attr['attribute'].'_'.$attr['sort'];
+
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getRemoveWordsIfNoResult($storeId = NULL)
