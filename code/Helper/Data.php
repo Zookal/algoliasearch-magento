@@ -1224,55 +1224,39 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
     public function getCategoryAdditionalAttributes($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_CATEGORY_ATTRIBUTES, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getProductAdditionalAttributes($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_PRODUCT_ATTRIBUTES, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getFacets($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_FACETS, $storeId));
+        if(!$attrs){
+            return array();
+        }
 
         foreach ($attrs as &$attr)
             if ($attr['type'] == 'other')
                 $attr['type'] = $attr['other_type'];
 
-        if (is_array($attrs))
-            return array_values($attrs);
-
-        return array();
+        return is_array($attrs) ? array_values($attrs) : array();
     }
 
     public function getCategoryCustomRanking($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_CATEGORY_CUSTOM_RANKING, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getProductCustomRanking($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_PRODUCT_CUSTOM_RANKING, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getSaveLastQuery($storeId = NULL)
@@ -1308,24 +1292,20 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
     public function getExcludedPages($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_EXCLUDED_PAGES, $storeId));
-
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getSortingIndices($storeId = NULL)
     {
         $attrs = unserialize(Mage::getStoreConfig(self::XML_PATH_SORTING_INDICES, $storeId));
+        if(!$attrs){
+            return array();
+        }
 
         foreach ($attrs as &$attr)
             $attr['index_name'] = $this->getIndexName($storeId).'_products_'.$attr['attribute'].'_'.$attr['sort'];
 
-        if (is_array($attrs))
-            return $attrs;
-
-        return array();
+        return is_array($attrs) ? $attrs : array();
     }
 
     public function getRemoveWordsIfNoResult($storeId = NULL)
