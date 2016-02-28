@@ -256,13 +256,25 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
         {
             $resultsLimit = $this->getResultsLimit($storeId);
 
-            $answer = $this->query($this->getIndexName($storeId).'_products', $queryText, array(
+            $args = array(
                 'hitsPerPage' => max(5, min($resultsLimit, 1000)), // retrieve all the hits (hard limit is 1000)
                 'attributesToRetrieve' => 'objectID',
                 'attributesToHighlight' => '',
                 'attributesToSnippet' => '',
                 'removeWordsIfNoResult'=> $this->getRemoveWordsIfNoResult($storeId),
+            );
+
+            $argsContainer = new Varien_Object();
+            Mage::dispatchEvent('algolia_search_result_query_before', array('params'         => Mage::app()->getRequest()->getParams(),
+                                                                            'args'           => $args,
+                                                                            'args_container' => $argsContainer
             ));
+
+            if ($argsContainer->getArgs()) {
+                $args = $argsContainer->getArgs();
+            }
+
+            $answer = $this->query($this->getIndexName($storeId).'_products', $queryText, $args);
         }
         catch (Exception $e)
         {
