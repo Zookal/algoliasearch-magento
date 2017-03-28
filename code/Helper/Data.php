@@ -1282,4 +1282,9 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
         return (bool) Mage::getStoreConfigFlag(self::XML_PATH_USE_RESULT_CACHE, $storeId);
     }
 
+    public function isX3Version()
+    {
+        return Mage::EDITION_ENTERPRISE === Mage::getEdition() && version_compare(Mage::getVersion(), '1.14.3', '>=') ||
+            Mage::EDITION_COMMUNITY === Mage::getEdition() && version_compare(Mage::getVersion(), '1.9.3', '>=');
+    }
 }
