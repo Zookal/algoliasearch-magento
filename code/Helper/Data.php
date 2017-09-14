@@ -222,7 +222,8 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
         $indexSettings = array(
             'attributesToIndex'         => array_values(array_unique($attributesToIndex)),
             'customRanking'             => $customRankingsArr,
-            'unretrievableAttributes'   => $unretrievableAttributes
+            'unretrievableAttributes'   => $unretrievableAttributes,
+            'separatorsToIndex' => '/',
         );
 
         // Additional index settings from event observer
