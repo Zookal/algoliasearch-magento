@@ -47,7 +47,7 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
      *
      * @var array
      */
-    static private $_predefinedProductAttributes = array('name', 'url_key', 'description', 'image', 'thumbnail');
+    static private $_predefinedProductAttributes = array('name', 'url_key', 'image', 'thumbnail');
 
     /**
      * Predefined product attributes that will be retrieved from the index
@@ -497,8 +497,7 @@ class Algolia_Algoliasearch_Helper_Data extends Mage_Core_Helper_Abstract
             'name'              => $product->getName(),
             'price'             => $product->getPrice(),
             'price_with_tax'    => Mage::helper('tax')->getPrice($product, $product->getPrice(), true, null, null, null, null, false),
-            'url'               => $product->getProductUrl(),
-            'description'       => $product->getDescription()
+            'url'               => $product->getProductUrl()
         );
 
         $categories             = array();
