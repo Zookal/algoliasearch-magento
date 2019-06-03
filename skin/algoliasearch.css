@@ -15,7 +15,8 @@
     padding: 5px 0;
 }
 
-.algoliasearch-autocomplete-hit:not(:first-child):not(:last-child)
+.algoliasearch-autocomplete-hit:not(:first-child):not(:last-child),
+.aa-suggestion
 {
     border-bottom: solid 1px #DDDDDD;
 }
